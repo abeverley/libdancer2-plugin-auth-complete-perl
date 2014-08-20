@@ -4,7 +4,6 @@ LICENSE
 MANIFEST
 META.yml
 Makefile.PL
-README.pod
 dist.ini
 lib/Dancer2/Plugin/Auth/Complete.pm
 t/author-critic.t
