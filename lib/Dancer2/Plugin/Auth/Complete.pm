@@ -671,8 +671,11 @@ Permissions can be defined and tested for a user (see synopsis). Permissions are
 =over 4
 
 =item * Integrate with L<Dancer2::Plugin::Auth::Extensible>
+
 =item * Add test suite
+
 =item * Provide a way of overriding the auto-password generation function
+
 =item * Store the last login time
 
 =back
@@ -688,6 +691,7 @@ You may distribute this code under the same terms as Perl itself.
 =over 4
 
 =item * L<Dancer2::Plugin::Auth::Extensible>
+
 =item * L<Dancer2::Plugin::DBIC>
 
 =back
