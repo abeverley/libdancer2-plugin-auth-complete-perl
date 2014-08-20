@@ -423,8 +423,8 @@ sub _user
             or croak "Permissions field must be defined in schema when permissions are enabled";
         foreach my $permission (keys %{$conf->{permissions}})
         {
-            $retuser->{$permissions_field}->{$permission} =
-                $user->$permission_field & $conf->{permissions}->{$permission}->{value} ? $conf->{permissions}->{$permission} : undef;
+            $retuser->{$permissions_field}->{$permission} = $conf->{permissions}->{$permission} 
+                if $user->$permission_field & $conf->{permissions}->{$permission}->{value};
         }
     }
     $retuser;
@@ -575,6 +575,8 @@ register 'logout' => sub {
 =head2 user
 
 C<user> provides various ways of accessing and updating user information. Without any arguments, it returns the details (in accordance with the schema) of the current logged-in user. If passed the ID of a user (in accordance with the key defined in the config) it returns the details of that user. The key value must be the user's key in the database (DBIC's find() is used for the lookup).
+
+A user's details are returned using keys as defined in the schema. Permissions that a user has are returned in the same format as the configuration file (ie. a key for each permission as per the configuration file, a value as a hash containing the value and description of the permission).
 
 If passed a user ID and a hashref of updated values, it updates the relevant user's details.
 

@@ -192,6 +192,8 @@ C<logout> destroys the session.
 
 C<user> provides various ways of accessing and updating user information. Without any arguments, it returns the details (in accordance with the schema) of the current logged-in user. If passed the ID of a user (in accordance with the key defined in the config) it returns the details of that user. The key value must be the user's key in the database (DBIC's find() is used for the lookup).
 
+A user's details are returned using keys as defined in the schema. Permissions that a user has are returned in the same format as the configuration file (ie. a key for each permission as per the configuration file, a value as a hash containing the value and description of the permission).
+
 If passed a user ID and a hashref of updated values, it updates the relevant user's details.
 
 If passed an empty user ID and a hashref of values, it creates that user. If a key is provided with a database key, it updates that user instead.
