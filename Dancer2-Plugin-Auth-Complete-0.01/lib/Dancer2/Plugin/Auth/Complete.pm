@@ -110,6 +110,47 @@ function. The schema for the authentication and users is defined in the
 config file. A sensible default schema is included - see below for more
 details.
 
+=head1 QUICK START
+
+Create the following database schema with a table called C<user>:
+
+  | id         | int(11)      | PRI | auto_increment |
+  | email      | varchar(45)  |     |                |
+  | username   | varchar(45)  |     |                |
+  | password   | varchar(128) |     |                |
+  | pwchanged  | datetime     |     |                |
+  | resetpw    | char(32)     |     |                |
+
+Create the following config:
+
+  Auth::Complete:
+    emails:
+      new_account:
+        from: '"Sender" <email@example.com>'    # The sender of new account emails
+      reset_pw:
+        from: '"Sender" <email@example.com>'    # The sender of password resets requests
+
+Create a HTML form with username and password fields:
+
+  <form>
+    <input type="text" name="username">
+    <input type="password" name="password">
+    <input type="submit" name="submit" value="Login">
+  </form>
+
+Capture a login request:
+
+  post '/login' => sub {
+    if (param('username'))
+    {
+      if (login) {
+        ...
+      }
+    }
+  };
+
+See the synopsis for further examples.
+
 =head1 CONFIGURATION
 
 The following configures the module. Values specified below are defaults,
