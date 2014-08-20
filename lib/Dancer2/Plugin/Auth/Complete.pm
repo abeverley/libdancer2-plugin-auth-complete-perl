@@ -608,7 +608,8 @@ C<permission> takes the name of a permission, checks it against the current user
 register 'permission' => sub {
     my ($dsl, $permission) = @_;
     my $user = _user $dsl;
-    $user->{permissions}->{$permission} ? 1 : 0;
+    my $permissions_field = $conf->{schema}->{fields}->{permissions};
+    $user->{$permissions_field}->{$permission} ? 1 : 0;
 };
 
 =head2 reset_pw
