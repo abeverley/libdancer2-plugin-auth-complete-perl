@@ -668,11 +668,14 @@ Permissions can be defined and tested for a user (see synopsis). Permissions are
 
 =head1 TODO
 
-=for :list
-* Integrate with L<Dancer2::Plugin::Auth::Extensible>
-* Add test suite
-* Provide a way of overriding the auto-password generation function
-* Store the last login time
+=over 4
+
+=item * Integrate with L<Dancer2::Plugin::Auth::Extensible>
+=item * Add test suite
+=item * Provide a way of overriding the auto-password generation function
+=item * Store the last login time
+
+=back
 
 =head1 COPYRIGHT & LICENCE
 
@@ -682,11 +685,12 @@ You may distribute this code under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-See the following related modules:
+=over 4
 
-=for :list
-* L<Dancer2::Plugin::Auth::Extensible>
-* L<Dancer2::Plugin::DBIC>
+=item * L<Dancer2::Plugin::Auth::Extensible>
+=item * L<Dancer2::Plugin::DBIC>
+
+=back
 
 =head1 ACKNOWLEDGMENTS
 
