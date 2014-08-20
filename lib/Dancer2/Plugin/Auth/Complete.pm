@@ -170,9 +170,12 @@ unless otherwise specified.
         pw_last_changed: pwchanged    # Datetime field to store time of last password change (defaults empty - optional)
         pw_reset_code: pw_reset_code  # 32 character field to store password reset requests
     permissions:
-      admin: 1                        # Defined permissions (defaults empty). See below.
-      read: 2
-      write: 4
+      read_only:                      # Defined permissions (defaults empty). See below.
+        value: 1
+        description: Read-only user
+      admin:
+        value: 2
+        description: Administrator
     urls:
       reset_pw: /resetpw              # URL to use for password reset requests
       login: /login                   # Defines where a protected route is redirected
@@ -313,7 +316,7 @@ sub _user
                 $new->{$permissions_field} = 0;
                 foreach my $permission (keys %{$conf->{permissions}})
                 {
-                    $new->{$permissions_field} |= $conf->{permissions}->{$permission}
+                    $new->{$permissions_field} |= $conf->{permissions}->{$permission}->{value}
                         if $update->{$permissions_field}->{$permission};
                 }
             }
@@ -416,7 +419,7 @@ sub _user
         foreach my $permission (keys %{$conf->{permissions}})
         {
             $retuser->{permissions}->{$permission} =
-                $user->$permission_field & $conf->{permissions}->{$permission} ? 1 : 0;
+                $user->$permission_field & $conf->{permissions}->{$permission}->{value} ? $conf->{permissions}->{$permission} : undef;
         }
     }
     $retuser;
@@ -589,7 +592,7 @@ register 'user' => sub {
 
 =head2 permission
 
-C<permission> checks the permissions of a particular user. Permissions are defined in the config, using binary bits for each parmission, and stored in the database as an integer value.
+C<permission> checks the permissions of a particular user. Permissions are defined in the config, using binary bits for each permission, and stored in the database as an integer value.
 
 C<permission> takes the name of a permission, checks it against the current user, and returns 1 if the user has that permission or 0 otherwise.
 
