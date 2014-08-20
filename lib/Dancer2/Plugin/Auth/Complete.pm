@@ -324,6 +324,9 @@ sub _user
                 }
             }
 
+            $new->{$username_field} = $update->{$username_field};
+            $new->{$email_field} = $update->{$email_field};
+
             unless ($user)
             {
                 # User doesn't exist. We expect a username and email.
