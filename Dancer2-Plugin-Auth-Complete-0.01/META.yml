@@ -1,0 +1,28 @@
+---
+abstract: 'Authorization module to do everything'
+author:
+  - 'Andy Beverley <andy@andybev.com>'
+build_requires: {}
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 5.008, CPAN::Meta::Converter version 2.120921'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Dancer2-Plugin-Auth-Complete
+requires:
+  Carp: 0
+  Crypt::SaltedHash: 0
+  Dancer2::Plugin: 0
+  Dancer2::Plugin::DBIC: 0
+  Email::Valid: 0
+  Emailesque: 0
+  Hash::Merge::Simple: 0
+  String::CamelCase: 0
+  Text::Autoformat: 0
+  perl: 5.008001
+  strict: 0
+  warnings: 0
+version: 0.01
