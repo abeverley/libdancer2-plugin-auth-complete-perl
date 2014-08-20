@@ -725,7 +725,9 @@ Permissions can be defined and tested for a user (see synopsis). Permissions are
 
 Copyright 2014 Ctrl O Ltd and David Golden
 
-You may distribute this code under the same terms as Perl itself.
+This is free software, licensed under:
+
+The Apache License, Version 2.0, January 2004
 
 =head1 SEE ALSO
 
