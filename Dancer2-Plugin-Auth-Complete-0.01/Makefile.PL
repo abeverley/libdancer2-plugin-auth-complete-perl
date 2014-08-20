@@ -18,7 +18,7 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "Dancer2-Plugin-Auth-Complete",
   "EXE_FILES" => [],
-  "LICENSE" => "perl",
+  "LICENSE" => "apache",
   "NAME" => "Dancer2::Plugin::Auth::Complete",
   "PREREQ_PM" => {
     "Carp" => 0,

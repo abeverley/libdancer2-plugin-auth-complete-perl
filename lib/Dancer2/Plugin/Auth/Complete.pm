@@ -723,7 +723,7 @@ Permissions can be defined and tested for a user (see synopsis). Permissions are
 
 =head1 COPYRIGHT & LICENCE
 
-Copyright 2014 Ctrl O Ltd
+Copyright 2014 Ctrl O Ltd and David Golden
 
 You may distribute this code under the same terms as Perl itself.
 
