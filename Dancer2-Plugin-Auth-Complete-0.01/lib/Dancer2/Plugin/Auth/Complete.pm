@@ -283,10 +283,14 @@ sub _user
 
     my $table = camelize $conf->{schema}->{table};
 
+    my $key_field = $conf->{schema}->{fields}->{key};
+    my $permissions_field = $conf->{schema}->{fields}->{permissions};
+    my $email_field    = $conf->{schema}->{fields}->{email};
+    my $username_field = $conf->{schema}->{fields}->{username};
+
     if (my $update = $args->{update})
     {
         my $user; # Not set for new user
-        my $key_field = $conf->{schema}->{fields}->{key};
         my $key = $args->{user_id} ? $args->{user_id} : $update->{$key_field};
         my $deleted_field = $conf->{schema}->{fields}->{deleted};
         if ($user = $args->{user})
@@ -310,7 +314,6 @@ sub _user
             }
 
             # Calculate permissions value
-            my $permissions_field = $conf->{schema}->{fields}->{permissions};
             if ($conf->{permissions} && $update->{$permissions_field})
             {
                 $new->{$permissions_field} = 0;
@@ -321,8 +324,6 @@ sub _user
                 }
             }
 
-            my $email_field    = $conf->{schema}->{fields}->{email};
-            my $username_field = $conf->{schema}->{fields}->{username};
             unless ($user)
             {
                 # User doesn't exist. We expect a username and email.
@@ -411,14 +412,18 @@ sub _user
         $retuser->{$field} = $user->$field;
     }
 
+    $retuser->{$key_field} = $user->$key_field;
+    $retuser->{$email_field} = $user->$email_field;
+    $retuser->{$username_field} = $user->$username_field;
+
     if ($conf->{permissions})
     {
-        $retuser->{permissions} = {};
+        $retuser->{$permissions_field} = {};
         my $permission_field = $conf->{schema}->{fields}->{permissions}
             or croak "Permissions field must be defined in schema when permissions are enabled";
         foreach my $permission (keys %{$conf->{permissions}})
         {
-            $retuser->{permissions}->{$permission} =
+            $retuser->{$permissions_field}->{$permission} =
                 $user->$permission_field & $conf->{permissions}->{$permission}->{value} ? $conf->{permissions}->{$permission} : undef;
         }
     }
