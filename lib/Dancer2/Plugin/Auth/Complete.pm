@@ -324,8 +324,8 @@ sub _user
                 }
             }
 
-            $new->{$username_field} = $update->{$username_field};
-            $new->{$email_field} = $update->{$email_field};
+            $new->{$username_field} = $update->{$username_field} if exists($update->{$username_field});
+            $new->{$email_field}    = $update->{$email_field}    if exists($update->{$email_field});
 
             unless ($user)
             {
