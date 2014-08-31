@@ -583,7 +583,7 @@ register 'logout' => sub {
 
 C<user> provides various ways of accessing and updating user information. Without any arguments, it returns the details (in accordance with the schema) of the current logged-in user. If passed the ID of a user (in accordance with the key defined in the config) it returns the details of that user. The key value must be the user's key in the database (DBIC's find() is used for the lookup).
 
-A user's details are returned using keys as defined in the schema. Permissions that a user has are returned in the same format as the configuration file (ie. a key for each permission as per the configuration file, a value as a hash containing the value and description of the permission).
+A user's details are returned using keys as defined in the schema. Permissions that a user has are returned as a hash, with a key for each permission present. Each key has a value of a hash that contains details of the permission (as per the config file). See the permissions section for further information.
 
 If passed a user ID and a hashref of updated values, it updates the relevant user's details.
 
@@ -741,6 +741,8 @@ register_plugin for_versions => [2];
 =head1 PERMISSIONS
 
 Permissions can be defined and tested for a user (see synopsis). Permissions are calculated using binary bits for each defined permission and are stored in an integer field in the database. The permissions defined in the configuration should be powers of 2.
+
+When fetching user details, the permissions field as defined in the config is converted to a hashref, with a key aligning to each permission that a user has. The value of each key will be set to a hash containing details of the particular permission. Permissions that a user does not have will not exist. When updating a user, a hashref should also be provided, but with a key with a true value for each permission that a user should be set to.
 
 =head1 TODO
 
