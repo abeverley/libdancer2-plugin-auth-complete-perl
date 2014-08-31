@@ -67,13 +67,16 @@ my %dispatch = (
 
   # Process a password reset request
   my $code  = param 'submitted_code';
-  if (my $newpw = reset_pw('do' => $code))
+  if (my $newpw = reset_pw('code' => $code))
   {
     my $msg = "Your password has been reset to $newpw";
   }
   else {
     my $msg = "The submitted code was not valid";
   }
+
+  # Generate a new password when given existing password
+  my $new_pw = reset_pw 'password' => 'mysecret';
 
   # Update configuration on the fly
   Dancer2::Plugin::Auth::Complete->configure({
@@ -283,10 +286,11 @@ sub _user
 
     my $table = camelize $conf->{schema}->{table};
 
-    my $key_field = $conf->{schema}->{fields}->{key};
+    my $key_field         = $conf->{schema}->{fields}->{key};
     my $permissions_field = $conf->{schema}->{fields}->{permissions};
-    my $email_field    = $conf->{schema}->{fields}->{email};
-    my $username_field = $conf->{schema}->{fields}->{username};
+    my $email_field       = $conf->{schema}->{fields}->{email};
+    my $username_field    = $conf->{schema}->{fields}->{username};
+    my $pw_field          = $conf->{schema}->{fields}->{password};
 
     if (my $update = $args->{update})
     {
@@ -349,7 +353,6 @@ sub _user
                 }
             }
 
-            my $pw_field              = $conf->{schema}->{fields}->{password};
             my $pw_last_changed_field = $conf->{schema}->{fields}->{pw_last_changed};
             if ($update->{$pw_field})
             {
@@ -415,9 +418,10 @@ sub _user
         $retuser->{$field} = $user->$field;
     }
 
-    $retuser->{$key_field} = $user->$key_field;
-    $retuser->{$email_field} = $user->$email_field;
+    $retuser->{$key_field}      = $user->$key_field;
+    $retuser->{$email_field}    = $user->$email_field;
     $retuser->{$username_field} = $user->$username_field;
+    $retuser->{$pw_field}       = $user->$pw_field;
 
     if ($conf->{permissions})
     {
@@ -623,7 +627,9 @@ If passed the keyword 'send' followed by an email address, the email address wil
 
 If passed the keyword 'check' followed by a reset code, the reset code will be checked to see if it is valid. 1 will be returned for a valid code.
 
-If passed the keyword 'do' followed by a reset code, the password for the user will be reset with an automatically generated password. The new password will be returned from the function, or nothing will be returned for an invalid code.
+If passed the keyword 'code' followed by a reset code, the password for the user will be reset with an automatically generated password. The new password will be returned from the function, or nothing will be returned for an invalid code. An optional additional parameter can be passed, which will be the new password, in which case that will be used instead of an automatically generated password.
+
+If passed the keyword 'password' followed by the existing password for the user, then as long as the password is correct, a new password will be generated and returned. If an optional additional parameter is provided, that will be used for the new password, rather than an automatically generated password.
 
 =cut
 
@@ -661,7 +667,7 @@ register 'reset_pw' => sub {
         my $code = shift @args;
         _check_reset_code $code ? return 1 : return;
     }
-    elsif ($request eq 'do')
+    elsif ($request eq 'code')
     {
         # Reset a password in the database
         my ($code, $newpw) = @args;
@@ -677,6 +683,21 @@ register 'reset_pw' => sub {
             return $newpw;
         }
         return;
+    }
+    elsif ($request eq 'password')
+    {
+        # Reset a password in the database
+        my ($password, $newpw) = @args;
+        my $user  = _user $dsl;
+        my $dbpw = $user->{$conf->{schema}->{fields}->{password}};
+        Crypt::SaltedHash->validate($dbpw, $password)
+            or return;
+        $newpw = _random_pw unless $newpw;
+        my $update = {
+            $conf->{schema}->{fields}->{password} => $newpw,
+        };
+        _user($dsl, { user_id => $user->{id}, update => $update });
+        return $newpw;
     }
     else
     {
