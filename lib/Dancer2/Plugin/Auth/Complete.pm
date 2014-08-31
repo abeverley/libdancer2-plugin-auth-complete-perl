@@ -430,8 +430,9 @@ sub _user
             or croak "Permissions field must be defined in schema when permissions are enabled";
         foreach my $permission (keys %{$conf->{permissions}})
         {
+            my $user_perm = int $user->$permission_field;
             $retuser->{$permissions_field}->{$permission} = $conf->{permissions}->{$permission} 
-                if $user->$permission_field & $conf->{permissions}->{$permission}->{value};
+                if $user_perm & $conf->{permissions}->{$permission}->{value};
         }
     }
     $retuser;
