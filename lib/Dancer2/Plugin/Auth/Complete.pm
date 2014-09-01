@@ -15,7 +15,7 @@ use Text::Autoformat qw(autoformat break_wrap);
 use Hash::Merge::Simple qw/ merge /;
 
 use Dancer2::Plugin;
-use Dancer2::Plugin::DBIC qw(schema);
+use Dancer2::Plugin::DBIC qw//;
 
 my $schema = Dancer2::Plugin::DBIC::schema;
 my $conf   = _merge_conf(_default_conf(), plugin_setting);
