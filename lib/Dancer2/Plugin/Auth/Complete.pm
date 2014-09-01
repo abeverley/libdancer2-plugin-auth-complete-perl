@@ -17,8 +17,9 @@ use Hash::Merge::Simple qw/ merge /;
 use Dancer2::Plugin;
 use Dancer2::Plugin::DBIC qw(schema);
 
-my $schema = schema;
+my $schema = Dancer2::Plugin::DBIC::schema;
 my $conf   = _merge_conf(_default_conf(), plugin_setting);
+my $user_callback;
 
 my %dispatch = (
     valid_user => \&_build_login,
@@ -435,6 +436,11 @@ sub _user
                 if $user_perm & $conf->{permissions}->{$permission}->{value};
         }
     }
+
+    if ($user_callback)
+    {
+        $retuser = &$user_callback($retuser, $user);
+    }
     $retuser;
 }
 
@@ -720,7 +726,7 @@ sub configure
 };
 
 
-=head2 reset_pw
+=head2 extend
 
 C<extend> provides the same functionality as L<Dancer2::Plugin::Auth::Tiny>'s extend functionality. I am unsure whether it will of any use for this module, but it is left here for the moment.
 
@@ -733,6 +739,25 @@ sub extend
         croak "arguments to $class\->extend must be key/value pairs";
     }
     %dispatch = ( %dispatch, @args );
+}
+
+=head2 user_callback
+
+C<user_callback> allows a subroutine to be specified that will be executed each time a user is retrieved from the database. This allows additional parameters to be saved into the user hash before it is returned to the calling program. C<user_callback> should be passed a code reference which should return the updated hashref. The relevant coderef will be called with 2 parameters: the initial user hashref (to be altered) and a resultset containing the user retrieved from the database. For example:
+
+  Dancer2::Plugin::Auth::Complete->user_callback( sub {
+    my ($retuser, $user) = @_;
+    $retuser->{child} = $user->age < 18 ? 1 : 0;
+    $retuser;
+  });
+
+=cut
+
+sub user_callback
+{
+    my ($self, $cb) = @_;
+    $user_callback = $cb;
+    $cb;
 }
 
 register_plugin for_versions => [2];
