@@ -54,10 +54,10 @@ my %dispatch = (
   redirect '/login' unless user;
 
   # Update details of user ID 6 in database
-  user 6 => { firstname => "John" };
+  user 'update', id => 6, firstname => "John";
 
   # Delete user ID 7
-  user 7 => {}
+  user 'delete', id => 7;
 
   # Check user permissions
   permission 'admin'
@@ -272,176 +272,209 @@ sub _email
     email $email;
 }
 
-# Return or update user details.
-#
-# Arguments:
-#   user:    (optional) a DBIC schema result set with the user in to use for this request
-#   user_id: (optional) the database ID of the user. If not provided, the session user is used
-#   update:  (optional) the new details to update the user with
-#
-# Returns the (new) user
-#
-sub _user
+sub _usertable_rs
 {
-    my ($dsl, $args) = @_;
-
     my $table = camelize $conf->{schema}->{table};
+    $schema->resultset($table);
+}
 
-    my $key_field         = $conf->{schema}->{fields}->{key};
-    my $permissions_field = $conf->{schema}->{fields}->{permissions};
-    my $email_field       = $conf->{schema}->{fields}->{email};
-    my $username_field    = $conf->{schema}->{fields}->{username};
-    my $pw_field          = $conf->{schema}->{fields}->{password};
+sub _user_get
+{
+    my ($dsl, %params) = @_;
+    my %fields     = %{$conf->{schema}->{fields}};
+    my $search = \%params;
+    my $deleted_field = $fields{deleted};
+    $search->{$deleted_field} = 0
+        if $fields{deleted} && !exists $search->{$deleted_field};
+    my $request_field = $fields{request};
+    $search->{$request_field} = 0
+        if $fields{request} && !exists $search->{$request_field};
+    _user($dsl, search => $search);
+}
 
-    if (my $update = $args->{update})
+sub _user_update
+{
+    my $dsl        = shift;
+    my %args       = @_;
+    my $update     = $args{update};
+    my $user       = $args{user};
+    my %fields     = %{$conf->{schema}->{fields}};
+
+    if ($user = $args{user})
     {
-        my $user; # Not set for new user
-        my $key = $args->{user_id} ? $args->{user_id} : $update->{$key_field};
-        my $deleted_field = $conf->{schema}->{fields}->{deleted};
-        if ($user = $args->{user})
-        {
-            # Do nothing. Already have user result source
-        }
-        elsif ($key)
-        {
-            $user = $schema->resultset($table)->find($key)
-                or croak "Request update ID $update->{$key_field} not found";
-            croak "Requested ID $update->{$key_field} has been deleted"
-                if %$update && $deleted_field && $user->$deleted_field;
-        }
-
-        if (%$update) # Empty for a delete request
-        {
-            my $new;
-            foreach my $field (@{$conf->{schema}->{fields}->{details}})
-            {
-                $new->{$field} = $update->{$field} if exists $update->{$field};
-            }
-
-            # Calculate permissions value
-            if ($conf->{permissions} && $update->{$permissions_field})
-            {
-                $new->{$permissions_field} = 0;
-                foreach my $permission (keys %{$conf->{permissions}})
-                {
-                    $new->{$permissions_field} |= $conf->{permissions}->{$permission}->{value}
-                        if $update->{$permissions_field}->{$permission};
-                }
-            }
-
-            $new->{$username_field} = $update->{$username_field} if exists($update->{$username_field});
-            $new->{$email_field}    = $update->{$email_field}    if exists($update->{$email_field});
-
-            unless ($user)
-            {
-                # User doesn't exist. We expect a username and email.
-                $new->{$username_field} or croak "Please enter a username";
-                $new->{$email_field} or croak "Please enter an email address";
-            }
-            if (exists $new->{$email_field})
-            {
-                # Check for valid email, only if specified
-                $new->{$email_field} = Email::Valid->address($new->{$email_field})
-                    or croak "Please enter a valid email address";
-
-                # Check it doesn't already exist
-                if (!$user || $user->$email_field ne $new->{$email_field})
-                {
-                    my $search = { $email_field => $new->{$email_field} };
-                    $search->{$deleted_field} = 0 if $deleted_field;
-                    $schema->resultset($table)->search($search)->count
-                        and croak "Email address already exists";
-                }
-            }
-
-            my $pw_last_changed_field = $conf->{schema}->{fields}->{pw_last_changed};
-            if ($update->{$pw_field})
-            {
-                $new->{$pw_field} = _encrypt_pw $update->{$pw_field};
-                $new->{$pw_last_changed_field} = \"UTC_TIMESTAMP()" if $pw_last_changed_field;
-            }
-
-            my $pw_reset_code_field = $conf->{schema}->{fields}->{pw_reset_code};
-            say STDERR $pw_reset_code_field;
-            $new->{$pw_reset_code_field} = $update->{$pw_reset_code_field}
-                if exists $update->{$pw_reset_code_field};
-
-            if ($user)
-            {
-                $user->update($new)
-                    or croak "There was a database error updating the user";
-            }
-            else {
-                # New user
-                $user = $schema->resultset($table)->create($new)
-                    or croak "There was a database error creating the new user";
-                # Notify user
-                my $code = _reset_code;
-                $user->update({ $conf->{schema}->{fields}->{pw_reset_code} => $code })
-                    or croak "Unable to update user table with password reset request";
-                my $url           = $dsl->uri_for($conf->{urls}->{reset_pw})."/$code";
-                my $email_field   = $conf->{schema}->{fields}->{email};
-                my $email_details = $conf->{emails}->{new_account};
-                _email {
-                    to      => $user->$email_field,
-                    from    => $email_details->{from},
-                    subject => $email_details->{subject},
-                    plain   => $email_details->{plain},
-                    html    => $email_details->{html},
-                    url     => $url,
-                };
-            }
-        } else {
-            # Delete user request
-            $deleted_field ? $user->update({ $deleted_field => 1 }) : $user->delete
-                or croak "Database error deleting user";
-        }
+        # Do nothing. Already have user result source
+    }
+    elsif (my $key = $update->{$fields{key}})
+    {
+        # Existing user specified - update
+        $user = _usertable_rs->find($key)
+            or croak "Request update ID $key not found";
     }
 
-    my $user;
-    if ($args->{user})
+    my $new;
+    foreach my $field (@{$fields{details}})
     {
-        # Already have DBIC resultset for user
-        $user = $args->{user};
-    }
-    else {
-        my $user_id = $args->{user_id} || $dsl->app->session->read($conf->{logged_in_key})
-            or return;
-        $user = $schema->resultset($table)->find($user_id)
-            or return; # User account may have been deleted since login
-        my $deleted_field = $conf->{schema}->{fields}->{deleted};
-        return if $deleted_field && $user->$deleted_field; # Account deleted
+        $new->{$field} = $update->{$field} if exists $update->{$field};
     }
 
-    my $retuser;
-    foreach my $field (@{$conf->{schema}->{fields}->{details}})
+    # Calculate permissions value
+    if ($conf->{permissions} && $update->{$fields{permissions}})
     {
-        $retuser->{$field} = $user->$field;
-    }
-
-    $retuser->{$key_field}      = $user->$key_field;
-    $retuser->{$email_field}    = $user->$email_field;
-    $retuser->{$username_field} = $user->$username_field;
-    $retuser->{$pw_field}       = $user->$pw_field;
-
-    if ($conf->{permissions})
-    {
-        $retuser->{$permissions_field} = {};
-        my $permission_field = $conf->{schema}->{fields}->{permissions}
-            or croak "Permissions field must be defined in schema when permissions are enabled";
+        $new->{$fields{permissions}} = 0;
         foreach my $permission (keys %{$conf->{permissions}})
         {
-            my $user_perm = int $user->$permission_field;
-            $retuser->{$permissions_field}->{$permission} = $conf->{permissions}->{$permission} 
-                if $user_perm & $conf->{permissions}->{$permission}->{value};
+            $new->{$fields{permissions}} |= $conf->{permissions}->{$permission}->{value}
+                if $update->{$fields{permissions}}->{$permission};
         }
     }
 
-    if ($user_callback)
+    my $email_field = $fields{email};
+    $new->{$fields{username}} = $update->{$fields{username}}
+        if exists($update->{$fields{username}});
+    $new->{$email_field}      = $update->{$email_field}
+        if exists($update->{$email_field});
+    $new->{$fields{request}}  = $update->{$fields{request}}
+        if exists($update->{$fields{request}});
+    $new->{$fields{deleted}}  = $update->{$fields{deleted}}
+        if exists($update->{$fields{deleted}});
+
+    unless ($user)
     {
-        $retuser = &$user_callback($retuser, $user);
+        # User doesn't exist. We expect a username and email.
+        $new->{$fields{username}}
+            or croak "Please enter a username";
+        $new->{$email_field}
+            or croak "Please enter an email address";
     }
-    $retuser;
+
+    if (exists $new->{$email_field})
+    {
+        # Check for valid email, only if specified
+        $new->{$email_field} = Email::Valid->address($new->{$email_field})
+            or croak "Please enter a valid email address";
+
+        # Check it doesn't already exist
+        if (!$user || $user->$email_field ne $new->{$email_field})
+        {
+            my $search = { $email_field => $new->{$email_field} };
+            my $deleted_field = $conf->{schema}->{fields}->{deleted};
+            $search->{$deleted_field} = 0 if $deleted_field;
+            my $request_field = $conf->{schema}->{fields}->{request};
+            $search->{$request_field} = 0 if $request_field;
+            _usertable_rs->search($search)->count
+                and croak "Email address already exists";
+        }
+    }
+
+    my $pw_last_changed_field = $conf->{schema}->{fields}->{pw_last_changed};
+    if ($update->{$fields{password}})
+    {
+        $new->{$fields{password}}        = _encrypt_pw $update->{$fields{password}};
+        $new->{$fields{pw_last_changed}} = \"UTC_TIMESTAMP()"
+            if $fields{pw_last_changed};
+    }
+
+    $new->{$fields{pw_reset_code}} = $update->{$fields{pw_reset_code}}
+        if exists $update->{$fields{pw_reset_code}};
+
+    if ($user)
+    {
+        $user->update($new)
+            or croak "There was a database error updating the user";
+    }
+    else {
+        # New user
+        $user = _usertable_rs->create($new)
+            or croak "There was a database error creating the new user";
+
+        # Notify user if not an account request
+        unless ($update->{$fields{request}})
+        {
+            my $code = _reset_code;
+            $user->update({ $conf->{schema}->{fields}->{pw_reset_code} => $code })
+                or croak "Unable to update user table with password reset request";
+            my $url           = $dsl->uri_for($conf->{urls}->{reset_pw})."/$code";
+            my $email_field   = $fields{email};
+            my $email_details = $conf->{emails}->{new_account};
+            _email {
+                to      => $user->$email_field,
+                from    => $email_details->{from},
+                subject => $email_details->{subject},
+                plain   => $email_details->{plain},
+                html    => $email_details->{html},
+                url     => $url,
+            };
+        }
+    }
+    _user($dsl, user => $user);
+}
+
+sub _user
+{
+    my ($dsl, %args) = @_;
+
+    my %fields = %{$conf->{schema}->{fields}};
+
+    my @users;
+    if ($args{user})
+    {
+        # Already have DBIC resultset for user
+        @users = ($args{user});
+    }
+    else {
+        my $search  = $args{search};
+        @users = _usertable_rs->search($search)->all;
+        return unless @users;
+    }
+
+    my @retusers;
+    foreach my $user (@users)
+    {
+        my $retuser;
+
+        foreach my $field (@{$conf->{schema}->{fields}->{details}})
+        {
+            $retuser->{$field} = $user->$field;
+        }
+
+        foreach my $field (qw/key email username password/)
+        {
+            my $col = $fields{$field};
+            $retuser->{$col} = $user->$col;
+        }
+
+        if ($conf->{permissions})
+        {
+            $retuser->{$fields{permissions}} = {};
+            my $permission_field = $fields{permissions}
+                or croak "Permissions field must be defined in schema when permissions are enabled";
+            foreach my $permission (keys %{$conf->{permissions}})
+            {
+                my $user_perm = $user->$permission_field ? int $user->$permission_field : 0;
+                $retuser->{$permission_field}->{$permission} = $conf->{permissions}->{$permission} 
+                    if $user_perm & $conf->{permissions}->{$permission}->{value};
+            }
+        }
+
+        if ($user_callback)
+        {
+            $retuser = &$user_callback($retuser, $user);
+        }
+        push @retusers, $retuser;
+        last unless wantarray;
+    }
+
+    wantarray ? @retusers : pop @retusers;
+}
+
+sub _user_logged_in
+{
+    my $dsl     = shift;
+    my %fields  = %{$conf->{schema}->{fields}};
+    my $user_id = $dsl->app->session->read($conf->{logged_in_key})
+        or return;
+    my $search  = { $fields{key} => $user_id };
+    return _user $dsl, search => $search;
 }
 
 # XXX Copied from Dancer2::Plugin::Auth::Tiny - update?
@@ -467,8 +500,7 @@ sub _check_reset_code
 {
     my $code = shift;
 
-    my $table  = camelize $conf->{schema}->{table};
-    my ($user) = $schema->resultset($table)->search({
+    my ($user) = _usertable_rs->search({
         $conf->{schema}->{fields}->{pw_reset_code} => $code
     })->all;
     $user;
@@ -558,20 +590,13 @@ register 'login' => sub {
     my $password = $dsl->app->request->param('password');
     $username && $password or return;
 
-    my $table = camelize $conf->{schema}->{table};
-    my $search = {
-        username => $username,
-    };
-    if (my $del = $conf->{schema}->{fields}->{deleted})
-    {
-        $search->{$del} = 0;
-    }
-    my ($user) = $schema->resultset($table)->search($search);
+    my $user  = _user_get($dsl, $conf->{schema}->{fields}->{username} => $username);
 
     return unless $user;
-    Crypt::SaltedHash->validate($user->password, $password)
+    Crypt::SaltedHash->validate($user->{password}, $password)
         or return;
-    $dsl->app->session->write($conf->{logged_in_key} => $user->id);
+    my $keyf = $conf->{schema}->{fields}->{key};
+    $dsl->app->session->write($conf->{logged_in_key} => $user->{$keyf});
     1;
 };
 
@@ -588,27 +613,45 @@ register 'logout' => sub {
 
 =head2 user
 
-C<user> provides various ways of accessing and updating user information. Without any arguments, it returns the details (in accordance with the schema) of the current logged-in user. If passed the ID of a user (in accordance with the key defined in the config) it returns the details of that user. The key value must be the user's key in the database (DBIC's find() is used for the lookup).
+C<user> provides various ways of accessing and updating user information. Without any arguments, it returns the details (in accordance with the schema) of the current logged-in user. Other functions can be added using a keyword follwed by parameters:
+
+C<user 'get' => %search> is used to search for a user. It should be passed a hash with details of the user(s) to search for. In scalar context returns the first (or only) user; in list context returns all matching users.
 
 A user's details are returned using keys as defined in the schema. Permissions that a user has are returned as a hash, with a key for each permission present. Each key has a value of a hash that contains details of the permission (as per the config file). See the permissions section for further information.
 
-If passed a user ID and a hashref of updated values, it updates the relevant user's details.
+C<user 'update' => %details> is used to update or create a user. It should be passed a hash with the details to update. If the hash contains the schema's key, then that user will be updated, but if no key is passed then a new user is created. Either way, a hash of the updated or created user is returned.
 
-If passed an empty user ID and a hashref of values, it creates that user. If a key is provided with a database key, it updates that user instead.
-
-If passed a user ID and an empty hashref, it deletes the user.
+C<user 'delete' => %search> is used in the same manner as C<get>, except that all resultant users are deleted. Note that users are actually deleted from the database, even if the deleted option is used in the configuration. To only flag users as deleted, use C<update> instead.
 
 See the synopsis for examples.
 
 =cut
 
 register 'user' => sub {
-    my ($dsl, $user_id, $update) = @_;
-    my $args = {
-        user_id => $user_id,
-        update  => $update,
-    };
-    _user($dsl, $args);
+    my ($dsl, $action, %params) = @_;
+
+    my %fields = %{$conf->{schema}->{fields}};
+
+    if (!$action)
+    {
+        return _user_logged_in $dsl;
+    }
+    elsif ($action eq 'update')
+    {
+        return _user_update $dsl, update => \%params;
+    }
+    elsif ($action eq 'delete')
+    {
+        return _usertable_rs->search(\%params)->delete
+            or croak "Database error when deleting user";
+    }
+    elsif ($action eq 'get')
+    {
+        return _user_get $dsl, %params;
+    }
+    else {
+        croak "Unknown action $action";
+    }
 };
 
 =head2 permission
@@ -621,7 +664,7 @@ C<permission> takes the name of a permission, checks it against the current user
 
 register 'permission' => sub {
     my ($dsl, $permission) = @_;
-    my $user = _user $dsl;
+    my $user = _user_logged_in $dsl;
     my $permissions_field = $conf->{schema}->{fields}->{permissions};
     $user->{$permissions_field}->{$permission} ? 1 : 0;
 };
@@ -646,20 +689,25 @@ register 'reset_pw' => sub {
     if ($request eq 'send')
     {
         # Send a password reset request to an email address
-        my $username = shift @args;
-        my $table    = camelize $conf->{schema}->{table};
-        my ($user)   = $schema->resultset($table)->search({$conf->{schema}->{fields}->{username} => $username})->all;
-        $user or return 0;
+        my $email = shift @args;
+        my $user  = _user_get($dsl, $conf->{schema}->{fields}->{email} => $email);
+        $user or return 1; # Return success on user not found for security reasons
 
         # Generate random string for the password reset URL
         my $code = _reset_code;
-        $user->update({ $conf->{schema}->{fields}->{pw_reset_code} => $code })
-            or croak "Unable to update user table with password reset request";
+        my $keyf = $conf->{schema}->{fields}->{key};
+        _user_update(
+            $dsl,
+            update => {
+                $keyf => $user->{$keyf},
+                $conf->{schema}->{fields}->{pw_reset_code} => $code
+            }
+        );
         my $url = $dsl->uri_for($conf->{urls}->{reset_pw})."/$code";
         my $email_field = $conf->{schema}->{fields}->{email};
         my $email_details = $conf->{emails}->{reset_pw};
         _email {
-            to      => $user->$email_field,
+            to      => $user->{$email_field},
             from    => $email_details->{from},
             subject => $email_details->{subject},
             plain   => $email_details->{plain},
@@ -685,7 +733,7 @@ register 'reset_pw' => sub {
                 $conf->{schema}->{fields}->{password}      => $newpw,
                 $conf->{schema}->{fields}->{pw_reset_code} => undef,
             };
-            _user($dsl, { user => $user, update => $update });
+            _user_update($dsl, user => $user, update => $update);
             $dsl->app->destroy_session;
             return $newpw;
         }
@@ -695,15 +743,17 @@ register 'reset_pw' => sub {
     {
         # Reset a password in the database
         my ($password, $newpw) = @args;
-        my $user  = _user $dsl;
-        my $dbpw = $user->{$conf->{schema}->{fields}->{password}};
+        my $user   = _user $dsl;
+        my %fields = %{$conf->{schema}->{fields}};
+        my $dbpw = $user->{$fields{password}};
         Crypt::SaltedHash->validate($dbpw, $password)
             or return;
         $newpw = _random_pw unless $newpw;
         my $update = {
-            $conf->{schema}->{fields}->{password} => $newpw,
+            $fields{id}       => $user->{$fields{id}},
+            $fields{password} => $newpw,
         };
-        _user($dsl, { user_id => $user->{id}, update => $update });
+        _user($dsl, update => $update);
         return $newpw;
     }
     else
