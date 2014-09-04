@@ -13,6 +13,7 @@ use Emailesque;
 use Email::Valid;
 use Text::Autoformat qw(autoformat break_wrap);
 use Hash::Merge::Simple qw/ merge /;
+use DateTime;
 
 use Dancer2::Plugin;
 use Dancer2::Plugin::DBIC qw//;
@@ -370,7 +371,7 @@ sub _user_update
     if ($update->{$fields{password}})
     {
         $new->{$fields{password}}        = _encrypt_pw $update->{$fields{password}};
-        $new->{$fields{pw_last_changed}} = \"UTC_TIMESTAMP()"
+        $new->{$fields{pw_last_changed}} = DateTime->now
             if $fields{pw_last_changed};
     }
 
