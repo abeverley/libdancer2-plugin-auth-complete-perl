@@ -335,7 +335,7 @@ sub _user_update
     $new->{$email_field}      = $update->{$email_field}
         if exists($update->{$email_field});
     $new->{$fields{request}}  = $update->{$fields{request}}
-        if exists($update->{$fields{request}});
+        if $fields{request} && exists($update->{$fields{request}});
     $new->{$fields{deleted}}  = $update->{$fields{deleted}}
         if exists($update->{$fields{deleted}});
 
@@ -392,7 +392,7 @@ sub _user_update
         $update->{id} = $user->id;
 
         # Notify user if not an account request
-        unless ($update->{$fields{request}})
+        unless ($fields{request} && $update->{$fields{request}})
         {
             my $code = _reset_code;
             $user->update({ $conf->{schema}->{fields}->{pw_reset_code} => $code })
