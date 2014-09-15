@@ -371,6 +371,8 @@ sub _user
                 # New user
                 $user = $schema->resultset($table)->create($new)
                     or croak "There was a database error creating the new user";
+                # Pass back user ID of new user
+                $args->{update}->{id} = $user->id;
                 # Notify user
                 my $code = _reset_code;
                 $user->update({ $conf->{schema}->{fields}->{pw_reset_code} => $code })
