@@ -388,9 +388,6 @@ sub _user_update
         $user = _usertable_rs->create($new)
             or croak "There was a database error creating the new user";
 
-        # Pass back user ID of new user
-        $update->{id} = $user->id;
-
         # Notify user if not an account request
         unless ($fields{request} && $update->{$fields{request}})
         {
