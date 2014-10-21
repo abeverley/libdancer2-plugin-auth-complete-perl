@@ -676,7 +676,7 @@ C<reset_pw> provides various ways to process password resets.
 
 If passed the keyword 'send' followed by an email address, the email address will be sent a link to reset their password (as defined in the config). If the email address is not found, a value of 0 is returned. If the email address is found and the email is sent successfully, 1 is returned. Otherwise undef is returned.
 
-If passed the keyword 'check' followed by a reset code, the reset code will be checked to see if it is valid. 1 will be returned for a valid code.
+If passed the keyword 'check' followed by a reset code, the reset code will be checked to see if it is valid. The user ID will be returned for a valid code.
 
 If passed the keyword 'code' followed by a reset code, the password for the user will be reset with an automatically generated password. The new password will be returned from the function, or nothing will be returned for an invalid code. An optional additional parameter can be passed, which will be the new password, in which case that will be used instead of an automatically generated password.
 
@@ -721,7 +721,8 @@ register 'reset_pw' => sub {
     {
         # Check whether a reset code is valid
         my $code = shift @args;
-        _check_reset_code $code ? return 1 : return;
+        my $user = _check_reset_code $code;
+        $user ? return $user->id : return;
     }
     elsif ($request eq 'code')
     {
