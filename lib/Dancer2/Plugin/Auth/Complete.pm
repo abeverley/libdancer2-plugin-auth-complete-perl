@@ -756,7 +756,7 @@ register 'reset_pw' => sub {
             $fields{key}      => $user->{$fields{key}},
             $fields{password} => $newpw,
         };
-        _user($dsl, update => $update);
+        _user_update ($dsl, update => $update);
         return $newpw;
     }
     else
