@@ -175,6 +175,7 @@ unless otherwise specified.
         password: password            # The password field - varchar(101)
         pw_last_changed: pwchanged    # Datetime field to store time of last password change (defaults empty - optional)
         pw_reset_code: pw_reset_code  # 32 character field to store password reset requests
+        lastlogin: lastlogin          # The field to log the datetime of the last login (optional)
     permissions:
       read_only:                      # Defined permissions (defaults empty). See below.
         value: 1
@@ -317,6 +318,12 @@ sub _user_update
     foreach my $field (@{$fields{details}})
     {
         $new->{$field} = $update->{$field} if exists $update->{$field};
+    }
+
+    # Last login, if applicable
+    if (my $lastlogin = $conf->{schema}->{fields}->{lastlogin})
+    {
+        $new->{$lastlogin} = $update->{$lastlogin} if exists $update->{$lastlogin};
     }
 
     # Calculate permissions value
@@ -599,6 +606,17 @@ register 'login' => sub {
         or return;
     my $keyf = $conf->{schema}->{fields}->{key};
     $dsl->app->session->write($conf->{logged_in_key} => $user->{$keyf});
+    if (my $lastlogin = $conf->{schema}->{fields}->{lastlogin})
+    {
+        # Update last login time in database
+        _user_update(
+            $dsl,
+            update => {
+                $keyf      => $user->{$keyf},
+                $lastlogin => DateTime->now,
+            }
+        );
+    }
     1;
 };
 
