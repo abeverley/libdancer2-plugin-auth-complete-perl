@@ -202,6 +202,7 @@ unless otherwise specified.
 
           [URL]
     logged_in_key: user               # Defines the Dancer2 session key used for the user
+    last_seen_key: user_last_seen     # The session key to store the time the user was last seen
     callback_key: return_url          # Defines the parameter key with the original request URL that is passed to the login route
     passthrough: user                 # A list of parameters that should be passed through to the login handler
 
@@ -487,6 +488,13 @@ sub _user_logged_in
     my %fields  = %{$conf->{schema}->{fields}};
     my $user_id = $dsl->app->session->read($conf->{logged_in_key})
         or return;
+    if (my $timeout = $conf->{timeout})
+    {
+        # Check for session timeout if configured
+        return unless
+            $dsl->app->session->read($conf->{last_seen_key}) > time - $timeout;
+        $dsl->app->session->write($conf->{last_seen_key} => time);
+    }
     my $search  = { $fields{key} => $user_id };
     return _user $dsl, search => $search;
 }
@@ -550,6 +558,7 @@ sub _default_conf
             },
         },
         logged_in_key => 'user_id',
+        last_seen_key => 'user_last_seen',
         callback_key  => 'return_url',
         passthrough   => [qw/user/],
     }
@@ -611,6 +620,8 @@ register 'login' => sub {
         or return;
     my $keyf = $conf->{schema}->{fields}->{key};
     $dsl->app->session->write($conf->{logged_in_key} => $user->{$keyf});
+    $dsl->app->session->write($conf->{last_seen_key} => time)
+        if $conf->{timeout};
     if (my $lastlogin = $conf->{schema}->{fields}->{lastlogin})
     {
         # Update last login time in database
