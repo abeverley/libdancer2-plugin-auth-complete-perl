@@ -491,8 +491,8 @@ sub _user_logged_in
     if (my $timeout = $conf->{timeout})
     {
         # Check for session timeout if configured
-        return unless
-            $dsl->app->session->read($conf->{last_seen_key}) > time - $timeout;
+        my $last_seen = $dsl->app->session->read($conf->{last_seen_key}) // 0;
+        return unless $last_seen > time - $timeout;
         $dsl->app->session->write($conf->{last_seen_key} => time);
     }
     my $search  = { $fields{key} => $user_id };
