@@ -452,6 +452,11 @@ sub _user
             $retuser->{$col} = $user->$col;
         }
 
+        if (my $lastlogin = $conf->{schema}->{fields}->{lastlogin})
+        {
+            $retuser->{$lastlogin} = $user->$lastlogin;
+        }
+
         if ($conf->{permissions})
         {
             $retuser->{$fields{permissions}} = {};
