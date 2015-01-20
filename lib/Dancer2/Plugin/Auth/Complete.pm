@@ -492,7 +492,11 @@ sub _user_logged_in
     {
         # Check for session timeout if configured
         my $last_seen = $dsl->app->session->read($conf->{last_seen_key}) // 0;
-        return unless $last_seen > time - $timeout;
+        unless ($last_seen > time - $timeout)
+        {
+            $dsl->app->destroy_session;
+            return;
+        }
         $dsl->app->session->write($conf->{last_seen_key} => time);
     }
     my $search  = { $fields{key} => $user_id };
