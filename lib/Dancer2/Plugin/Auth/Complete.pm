@@ -561,10 +561,11 @@ sub _default_conf
                 plain   => "Click the link to reset your password:\n[URL]\n",
             },
         },
-        logged_in_key => 'user_id',
-        last_seen_key => 'user_last_seen',
-        callback_key  => 'return_url',
-        passthrough   => [qw/user/],
+        logged_in_key  => 'user_id',
+        last_seen_key  => 'user_last_seen',
+        last_login_key => 'last_login',
+        callback_key   => 'return_url',
+        passthrough    => [qw/user/],
     }
 }
 
@@ -628,7 +629,9 @@ register 'login' => sub {
         if $conf->{timeout};
     if (my $lastlogin = $conf->{schema}->{fields}->{lastlogin})
     {
-        # Update last login time in database
+        # First store previous login time in session
+        $dsl->app->session->write($conf->{last_login_key} => $user->{lastlogin});
+        # Then update it with this time in database
         _user_update(
             $dsl,
             update => {
